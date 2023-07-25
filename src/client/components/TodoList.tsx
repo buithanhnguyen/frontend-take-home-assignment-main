@@ -1,6 +1,9 @@
 import type { SVGProps } from 'react'
 
+import * as Tabs from '@radix-ui/react-tabs'
+import { useState } from 'react'
 import * as Checkbox from '@radix-ui/react-checkbox'
+import { useAutoAnimate } from '@formkit/auto-animate/react'
 
 import { api } from '@/utils/client/api'
 
@@ -64,31 +67,112 @@ import { api } from '@/utils/client/api'
  */
 
 export const TodoList = () => {
+  const [activeTab, setActiveTab] = useState('all')
+  const [parent] = useAutoAnimate()
   const { data: todos = [] } = api.todo.getAll.useQuery({
     statuses: ['completed', 'pending'],
   })
+  const apiContext = api.useContext()
+  const { mutate: updateTodoStatus } = api.todoStatus.update.useMutation({
+    onSuccess: () => {
+      apiContext.todo.getAll.refetch()
+    },
+  })
 
+  const { mutate: deleteTodo } = api.todo.delete.useMutation({
+    onSuccess: () => {
+      apiContext.todo.getAll.refetch()
+    },
+  })
+
+  const filterListTodo =
+    activeTab === 'all'
+      ? todos
+      : todos.filter((item) => item.status === activeTab)
+
+  const handleChangeTab = (value: string) => {
+    setActiveTab(value)
+  }
   return (
-    <ul className="grid grid-cols-1 gap-y-3">
-      {todos.map((todo) => (
-        <li key={todo.id}>
-          <div className="flex items-center rounded-12 border border-gray-200 px-4 py-3 shadow-sm">
-            <Checkbox.Root
-              id={String(todo.id)}
-              className="flex h-6 w-6 items-center justify-center rounded-6 border border-gray-300 focus:border-gray-700 focus:outline-none data-[state=checked]:border-gray-700 data-[state=checked]:bg-gray-700"
-            >
-              <Checkbox.Indicator>
-                <CheckIcon className="h-4 w-4 text-white" />
-              </Checkbox.Indicator>
-            </Checkbox.Root>
+    <>
+      <Tabs.Root
+        value={activeTab}
+        defaultValue="all"
+        onValueChange={handleChangeTab}
+      >
+        <Tabs.List className="mb-10">
+          <Tabs.Trigger
+            className="rounded-full border-2 border-gray-300 bg-white px-6 py-2 text-gray-900 focus:bg-gray-800 focus:text-white"
+            value="all"
+          >
+            All
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            className="ml-2 rounded-full border-2 border-gray-300 bg-white px-6 py-2 text-gray-900 focus:bg-gray-800 focus:text-white"
+            value="pending"
+          >
+            Pending
+          </Tabs.Trigger>
+          <Tabs.Trigger
+            className="ml-2 rounded-full border-2 border-gray-300 bg-white px-6 py-2 text-gray-900 focus:bg-gray-800 focus:text-white"
+            value="completed"
+          >
+            Complete
+          </Tabs.Trigger>
+        </Tabs.List>
 
-            <label className="block pl-3 font-medium" htmlFor={String(todo.id)}>
-              {todo.body}
-            </label>
-          </div>
-        </li>
-      ))}
-    </ul>
+        <Tabs.Content value={activeTab}>
+          <ul className="grid grid-cols-1 gap-y-3" ref={parent}>
+            {filterListTodo.map((todo) => (
+              <li key={todo.id}>
+                <div
+                  className={`relative flex items-center rounded-12 border border-gray-200 px-4 py-3 ${
+                    todo.status === 'completed'
+                      ? 'bg-gray-100 text-gray-500 line-through'
+                      : ''
+                  }`}
+                >
+                  <Checkbox.Root
+                    id={String(todo.id)}
+                    checked={todo.status === 'completed'}
+                    onClick={() => {
+                      updateTodoStatus({
+                        todoId: todo.id,
+                        status:
+                          todo.status === 'completed' ? 'pending' : 'completed',
+                      })
+                    }}
+                    className="flex h-6 w-6 items-center justify-center rounded-6 border border-gray-300 focus:border-gray-700 focus:outline-none data-[state=checked]:border-gray-700 data-[state=checked]:bg-gray-700"
+                  >
+                    <Checkbox.Indicator>
+                      <CheckIcon className="h-4 w-4 text-white" />
+                    </Checkbox.Indicator>
+                  </Checkbox.Root>
+
+                  <label
+                    className="block pl-3 font-medium"
+                    htmlFor={String(todo.id)}
+                  >
+                    {todo.body}
+                  </label>
+                  <button
+                    onClick={() => {
+                      deleteTodo({
+                        id: todo.id,
+                      })
+                    }}
+                    type="button"
+                    className="px-5"
+                  >
+                    <XMarkIcon className="absolute right-3 -mt-3 h-6 w-6" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Tabs.Content>
+      </Tabs.Root>
+    </>
   )
 }
 
